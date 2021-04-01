@@ -67,7 +67,7 @@ async def backend_setup():
 			await scrape() # start ripping courses
 
 async def scrape():
-	for course_id in range(0x03CF24CA, sys.maxsize): # data_id is a uint64 so try all possible values
+	for course_id in range(sys.maxsize): # data_id is a uint64 so try all possible values
 		time.sleep(1) # can be removed, used to not spam Nintendo servers too much
 		#course_id = 0x03CF24CA # testing ID
 		print('Trying course ID %d...' % course_id)
