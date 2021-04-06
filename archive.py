@@ -1,10 +1,12 @@
 '''
-Jonathan Barrow 2021
+Credit Jonathan Barrow 2021
 
 This will rip courses from SMM1 using NEX to automate the process
 Use at your own risk, I am not resposible for any bans
 
 Requires Python 3 and https://github.com/Kinnay/NintendoClients
+
+Licensed under GNU GPLv3
 '''
 
 from nintendo.nex import backend, ranking, datastore_smm, settings, rmc, common, streams
