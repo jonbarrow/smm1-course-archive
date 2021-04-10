@@ -1,12 +1,10 @@
 '''
-Credit Jonathan Barrow 2021
+Jonathan Barrow 2021
 
 This will rip courses from SMM1 using NEX to automate the process
 Use at your own risk, I am not resposible for any bans
 
 Requires Python 3 and https://github.com/Kinnay/NintendoClients
-
-Licensed under GNU GPLv3
 '''
 
 from nintendo.nex import backend, ranking, datastore_smm, settings, rmc, common, streams
@@ -22,21 +20,28 @@ import json
 import logging
 logging.basicConfig(level=logging.INFO)
 
+json_file = open('config.json')
+config = json.load(json_file)
+
 # Unique device info
-DEVICE_ID = 0
-SERIAL_NUMBER = "REDACTED"
-SYSTEM_VERSION = 0x260
-REGION_ID = 4
-COUNTRY_NAME = "US"
-LANGUAGE = "en"
+DEVICE_ID = config['DEVICE_ID']
+SERIAL_NUMBER = config['SERIAL_NUMBER']
+SYSTEM_VERSION = config['SYSTEM_VERSION']
+REGION_ID = config['REGION_ID']
+COUNTRY_NAME = config['COUNTRY_NAME']
+LANGUAGE = config['LANGUAGE']
 
-USERNAME = "REDACTED" #Nintendo network id
-PASSWORD = "REDACTED" #Nintendo network password
+USERNAME = config['USERNAME'] #Nintendo network id
+PASSWORD = config['PASSWORD'] #Nintendo network password
 
-# Globals
-nas = None
+# Globals (get set later)
 nex_token = None
-datastore_smm_client = None # set later
+datastore_smm_client = None
+
+# some of these are invalid, I didnt feel like making a list of them all
+# this should work just fine though
+event_course_ids = range(930000, 930050)
+official_maker_course_ids = range(910000, 920001)
 
 async def main():
 	os.makedirs('./courses', exist_ok=True)
@@ -45,7 +50,6 @@ async def main():
 	await backend_setup() # setup the backend NEX client and start scraping
 
 async def nas_login():
-	global nas
 	global nex_token
 
 	nas = nnas.NNASClient()
@@ -84,23 +88,49 @@ async def scrape():
 			headers = {header.key: header.value for header in result.headers}
 			course_data_url = result.url
 
+			print(course_data_url)
+
 			# Get course metadata
 
-			metadata = {}
+			metadata = {
+				'is_event_course': False,
+				'is_official_maker_course': False,
+				'world_record': {}
+			}
 
-			param = DataStoreGetCustomRankingByDataIdParam()
-			param.application_id = 0
-			param.data_id_list = [course_id]
-			param.result_option = 0x27
+			if course_id in event_course_ids or course_id in official_maker_course_ids:
 
-			result = await get_custom_ranking_by_data_id(param)
+				param = datastore_smm.DataStoreGetMetaParam()
+				param.data_id = course_id
+				param.persistence_target = datastore_smm.DataStorePersistenceTarget()
+				param.persistence_target.owner_id = 0
+				param.persistence_target.persistence_id = 0xFFFF
+				param.result_option = 6
+				param.access_password = 0
 
-			ranking_result = result.ranking_result[0]
-			meta_info = ranking_result.meta_info
 
+				result = await datastore_smm_client.get_metas_multiple_param([param])
+
+				meta_info = result.infos[0]
+
+				metadata['is_event_course'] = course_id in event_course_ids
+				metadata['is_official_maker_course'] = course_id in official_maker_course_ids
+			else:
+				param = DataStoreGetCustomRankingByDataIdParam()
+				param.application_id = 0
+				param.data_id_list = [course_id]
+				param.result_option = 0x27
+
+				result = await get_custom_ranking_by_data_id(param)
+
+				ranking_result = result.ranking_result[0]
+				meta_info = ranking_result.meta_info
+				
+				metadata['stars'] = ranking_result.score
+
+			metadata['upload_time'] = meta_info.create_time.val # I think?
 			metadata['course_name'] = meta_info.name
 			metadata['creator_pid'] = meta_info.owner_id
-			metadata['stars'] = ranking_result.score
 			metadata['user_plays'] = meta_info.ratings[0].info.total_value
 			unknown1 = meta_info.ratings[1].info.total_value
 			metadata['clears'] = meta_info.ratings[2].info.total_value
@@ -117,7 +147,6 @@ async def scrape():
 
 			result = await get_course_record(param)
 
-			metadata['world_record'] = {}
 			metadata['world_record']['best_time_pid'] = result.best_pid
 			metadata['world_record']['first_complete_pid'] = result.first_pid
 			metadata['world_record']['time_milliseconds'] = result.best_score
@@ -140,7 +169,6 @@ async def scrape():
 		except:
 			print('Failed to get course %d' % course_id)
 			pass
-
 
 #########################################################
 # Not implemented in NintendoClients, implementing here #
