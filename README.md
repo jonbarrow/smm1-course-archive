@@ -1,1 +1,2 @@
-# Moved to https://github.com/PretendoNetwork/smm1-course-archive
+# DEPRECATED AND ARCHIVED
+# SEE https://github.com/PretendoNetwork/archival-tools FOR THE LATEST UPDATES
